@@ -1,0 +1,26 @@
+[
+  {
+    "question": "What is the acceptable torque range for the housing cover screws?"
+  },
+  {
+    "question": "How often should torque verification be performed during production?"
+  },
+  {
+    "question": "What is the maximum allowed burr height on the sealing edge?"
+  },
+  {
+    "question": "Which material is specified for the servo motor housing?"
+  },
+  {
+    "question": "What should be done if torque fails for two consecutive checks?"
+  },
+  {
+    "question": "What is the maximum allowed mounting face flatness?"
+  },
+  {
+    "question": "What scratch length is allowed for a Class B surface?"
+  },
+  {
+    "question": "Does Revision C change the approved torque range?"
+  }
+]
