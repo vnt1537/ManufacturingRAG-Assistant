@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Manufacturing RAG Assistant</title>
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="loading-box">
+            <div class="spinner"></div>
+            <h3>Running comparison</h3>
+            <p>Please wait while the model generates the baseline and RAG answers.</p>
+        </div>
+    </div>
+
+    <div class="page">
+        <header class="hero">
+            <div class="hero-text">
+                <p class="eyebrow">Open Source Manufacturing RAG Demo</p>
+                <h1>Manufacturing RAG Assistant</h1>
+                <p class="hero-subtitle">
+                    Compare a plain local LLM against the same model with retrieval-augmented generation on realistic manufacturing specifications, SOPs, quality checklists, maintenance guides, and engineering change notices.
+                </p>
+            </div>
+        </header>
+
+        <section class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-label">Documents</span>
+                <span class="stat-value">5</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Retriever</span>
+                <span class="stat-value">FAISS</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Embeddings</span>
+                <span class="stat-value">MiniLM</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Top K</span>
+                <span class="stat-value">4</span>
+            </div>
+        </section>
+
+        <section class="card form-card">
+            <form id="compareForm" method="post" action="/">
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="sample_question">Sample Questions</label>
+                        <select id="sample_question" name="sample_question">
+                            <option value="">Select a sample question</option>
+                            {% for question in sample_questions %}
+                                <option value="{{ question }}" {% if selected_question == question %}selected{% endif %}>
+                                    {{ question }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label for="model_name">Ollama Model</label>
+                        <input
+                            id="model_name"
+                            name="model_name"
+                            type="text"
+                            value="{{ model_name }}"
+                            placeholder="qwen2.5:3b"
+                        />
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="rag_mode">RAG Mode</label>
+                        <select id="rag_mode" name="rag_mode">
+                            <option value="strict" {% if rag_mode == "strict" %}selected{% endif %}>Strict grounded</option>
+                            <option value="hybrid" {% if rag_mode == "hybrid" %}selected{% endif %}>Hybrid fallback</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Mode Meaning</label>
+                        <div class="mode-help">
+                            <strong>Strict:</strong> answer only from retrieved docs.<br />
+                            <strong>Hybrid:</strong> use docs first, otherwise fall back to general knowledge.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="custom_question">Custom Question</label>
+                    <textarea
+                        id="custom_question"
+                        name="custom_question"
+                        rows="4"
+                        placeholder="Example: How often should torque verification be performed during production?"
+                    >{{ custom_question }}</textarea>
+                </div>
+
+                <div class="actions">
+                    <button id="submitButton" type="submit">Run Comparison</button>
+                </div>
+            </form>
+
+            {% if error_message %}
+                <div class="alert error">
+                    {{ error_message }}
+                </div>
+            {% endif %}
+        </section>
+
+        {% if final_question %}
+            <section class="card">
+                <h2>Question</h2>
+                <p class="question">{{ final_question }}</p>
+            </section>
+        {% endif %}
+
+        {% if baseline_answer or rag_answer %}
+            <section class="card verdict-card">
+                <h2>Comparison Verdict</h2>
+                <div class="verdict-grid">
+                    <div class="verdict-box baseline-box">
+                        <h3>Baseline</h3>
+                        <p>
+                            The plain LLM answer is generated without access to the manufacturing documents, so it may stay generic, uncertain, or miss revision-specific details.
+                        </p>
+                    </div>
+                    <div class="verdict-box rag-box">
+                        <h3>RAG</h3>
+                        <p>
+                            {% if rag_mode == "strict" %}
+                                Strict grounded mode uses only retrieved manufacturing documents, which is safer for controlled technical QA.
+                            {% else %}
+                                Hybrid mode uses retrieved manufacturing documents first and can fall back to general knowledge when the answer is not present in the document set.
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="results-grid">
+                <article class="card result-card baseline-result">
+                    <div class="card-header-row">
+                        <h2>Baseline LLM Answer</h2>
+                        <span class="result-tag neutral">Ungrounded</span>
+                    </div>
+                    <p>{{ baseline_answer }}</p>
+                </article>
+
+                <article class="card result-card rag-result">
+                    <div class="card-header-row">
+                        <h2>RAG Answer</h2>
+                        <span class="result-tag success">
+                            {% if rag_mode == "strict" %}
+                                Strict
+                            {% else %}
+                                Hybrid
+                            {% endif %}
+                        </span>
+                    </div>
+                    <p>{{ rag_answer }}</p>
+                </article>
+            </section>
+
+            <section class="card">
+                <h2>Retrieved Source Files</h2>
+                {% if retrieved_sources %}
+                    <div class="badge-list">
+                        {% for source in retrieved_sources %}
+                            <span class="source-badge">{{ source }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p>No sources retrieved.</p>
+                {% endif %}
+            </section>
+
+            <section class="card">
+                <h2>Retrieved Chunks</h2>
+                {% if retrieved_docs %}
+                    <div class="chunk-list">
+                        {% for doc in retrieved_docs %}
+                            <details class="chunk-item">
+                                <summary>
+                                    {{ doc.metadata.get("file_name", "unknown_source") }}
+                                </summary>
+                                <pre>{{ doc.page_content }}</pre>
+                            </details>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p>No chunks retrieved.</p>
+                {% endif %}
+            </section>
+        {% endif %}
+    </div>
+
+    <script>
+        const form = document.getElementById("compareForm");
+        const submitButton = document.getElementById("submitButton");
+        const loadingOverlay = document.getElementById("loadingOverlay");
+
+        if (form) {
+            form.addEventListener("submit", function () {
+                submitButton.disabled = true;
+                submitButton.textContent = "Running...";
+                loadingOverlay.classList.remove("hidden");
+            });
+        }
+    </script>
+</body>
+</html>

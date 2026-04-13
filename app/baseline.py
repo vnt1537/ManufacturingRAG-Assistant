@@ -7,16 +7,10 @@ DEFAULT_MODEL_NAME = "qwen2.5:3b"
 
 
 def get_llm(model_name: str = DEFAULT_MODEL_NAME) -> ChatOllama:
-    """
-    Return the local Ollama chat model.
-    """
     return ChatOllama(model=model_name, temperature=0)
 
 
 def generate_baseline_answer(question: str, model_name: str = DEFAULT_MODEL_NAME) -> str:
-    """
-    Generate an answer using only the LLM without any retrieval.
-    """
     llm = get_llm(model_name=model_name)
     prompt = BASELINE_PROMPT.invoke({"question": question})
     response = llm.invoke(prompt)
